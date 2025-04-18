@@ -68,7 +68,7 @@
 #include "tcp_dctcp.h"
 
 #define BBR_VERSION		3
-
+#define GSO_LEGACY_MAX_SIZE	65536u
 #define bbr_param(sk,name)	(bbr_ ## name)
 
 /* Scale factor for rate in pkt/uSec unit to avoid truncation in bandwidth
@@ -1536,10 +1536,10 @@ static void bbr_pick_probe_wait(struct sock *sk)
 
 	/* Decide the random round-trip bound for wait until probe: */
 	bbr->rounds_since_probe =
-		get_random_u32_below(bbr_param(sk, bw_probe_rand_rounds));
+		prandom_u32_max(bbr_param(sk, bw_probe_rand_rounds));
 	/* Decide the random wall clock bound for wait until probe: */
 	bbr->probe_wait_us = bbr_param(sk, bw_probe_base_us) +
-			     get_random_u32_below(bbr_param(sk, bw_probe_rand_us));
+			     prandom_u32_max(bbr_param(sk, bw_probe_rand_us));
 }
 
 static void bbr_set_cycle_idx(struct sock *sk, int cycle_idx)
@@ -2380,3 +2380,4 @@ MODULE_AUTHOR("David Morley <morleyd@google.com>");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("TCP BBR (Bottleneck Bandwidth and RTT)");
 MODULE_VERSION(__stringify(BBR_VERSION));
+#undef GSO_LEGACY_MAX_SIZE
