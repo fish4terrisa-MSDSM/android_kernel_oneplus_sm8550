@@ -31,10 +31,19 @@
 #define USB_VENDOR_APPLE        0x05ac
 
 #include <linux/module.h>
+#include <linux/netdevice.h>
+#include <linux/ctype.h>
+#include <linux/etherdevice.h>
+#include <linux/ethtool.h>
+#include <linux/workqueue.h>
+#include <linux/mii.h>
+#include <linux/crc32.h>
+#include <linux/usb.h>
+#include <linux/hrtimer.h>
+#include <linux/atomic.h>
 #include <linux/usb/usbnet.h>
 #include <linux/usb/cdc.h>
 #include <linux/usb/cdc_ncm.h>
-#include <linux/etherdevice.h>
 
 int idevice_debug_ncm_open(struct net_device *net)
 {
