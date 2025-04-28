@@ -589,6 +589,14 @@ config USB_IPHETH
 
 	  For more information: http://giagio.com/wiki/moin.cgi/iPhoneEthernetDriver
 
+config USB_IDEVICE_DEBUG_NCM
+	tristate "Apple iDevice Debug NCM Ethernet Driver"
+	default n
+	help
+		Module used to bring up the CDC NCM interfaces that appear in
+		configurations 5 and 6. If you're using usbmuxd and iOs >= 17.0,
+		say y.
+
 config USB_SIERRA_NET
 	tristate "USB-to-WWAN Driver for Sierra Wireless modems"
 	depends on USB_USBNET

@@ -932,7 +932,7 @@ int cdc_ncm_bind_common(struct usbnet *dev, struct usb_interface *intf, u8 data_
 
 	cdc_ncm_find_endpoints(dev, ctx->data);
 	cdc_ncm_find_endpoints(dev, ctx->control);
-	if (!dev->in || !dev->out || !dev->status) {
+	if (!dev->in || !dev->out || ( !dev->status && !(ctx->drvflags & CDC_NCM_FLAG_NO_NOTIFICATION_ENDPOINT)) ) {
 		dev_dbg(&intf->dev, "failed to collect endpoints\n");
 		goto error2;
 	}
