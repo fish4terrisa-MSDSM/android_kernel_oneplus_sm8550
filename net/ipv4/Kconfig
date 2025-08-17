@@ -700,6 +700,13 @@ config TCP_CONG_BBR2
 	using either TCP internal pacing or the fq ("Fair Queue") pacing packet
 	scheduler.
 
+config TCP_CONG_DAVIS
+	tristate "D* TCP"
+	default n
+	help
+
+	TCP D*
+
 choice
 	prompt "Default TCP congestion control"
 	default DEFAULT_CUBIC
@@ -740,6 +747,9 @@ choice
 	config DEFAULT_BBR2
 		bool "BBR2" if TCP_CONG_BBR2=y
 
+		config DEFAULT_DAVIS
+		bool "DAVIS" if TCP_CONG_DAVIS=y
+
 	config DEFAULT_RENO
 		bool "Reno"
 endchoice
@@ -765,6 +775,7 @@ config DEFAULT_TCP_CONG
 	default "cdg" if DEFAULT_CDG
 	default "bbr" if DEFAULT_BBR
 	default "bbr2" if DEFAULT_BBR2
+	default "davis" if DEFAULT_DAVIS
 	default "cubic"
 
 config TCP_MD5SIG
