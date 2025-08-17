@@ -196,7 +196,7 @@ EXPORT_SYMBOL_GPL(tcp_davis_init);
 
 void tcp_davis_release(struct sock *sk)
 {
-    struct davis __unused *davis = inet_csk_ca(sk);
+    struct davis *davis __maybe_unused = inet_csk_ca(sk);
 }
 EXPORT_SYMBOL_GPL(tcp_davis_release);
 
