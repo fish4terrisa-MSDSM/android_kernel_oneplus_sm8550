@@ -328,6 +328,7 @@ static void tcp_ecn_send_syn(struct sock *sk, struct sk_buff *skb)
 	struct tcp_sock *tp = tcp_sk(sk);
 	bool bpf_needs_ecn = tcp_bpf_ca_needs_ecn(sk);
 	bool use_ecn, use_accecn;
+	const struct dst_entry *dst = __sk_dst_get(sk);
 
 	use_accecn = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_ecn) == 3 ||
 		tcp_ca_needs_accecn(sk);
@@ -335,7 +336,6 @@ static void tcp_ecn_send_syn(struct sock *sk, struct sk_buff *skb)
 		READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_ecn) == 4 ||
 		tcp_ca_needs_ecn(sk) || bpf_needs_ecn || use_accecn;
 
-	const struct dst_entry *dst = __sk_dst_get(sk);
 
 	if (!use_ecn) {
 		if (dst && dst_feature(dst, RTAX_FEATURE_ECN))
@@ -790,7 +790,6 @@ static void tcp_options_write(__be32 *ptr, struct tcp_sock *tp,
 		tp->rx_opt.dsack = 0;
 	} else if (leftover_size > 0) {
 		*ptr++ = htonl((leftover_bytes << 16) |
-				*ptr++ = htonl((leftover_bytes << 16) |
 					(TCPOPT_NOP << 8) |
 					TCPOPT_NOP);
 	}
