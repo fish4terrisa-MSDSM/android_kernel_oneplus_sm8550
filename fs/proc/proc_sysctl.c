@@ -28,8 +28,9 @@ static const struct inode_operations proc_sys_dir_operations;
 /* shared constants to be used in various sysctls */
 const int sysctl_vals[] = { 0, 1, INT_MAX };
 EXPORT_SYMBOL(sysctl_vals);
-const int sysctl_vals_new[] = { -1, 0, 1, 2, 4, 100, 200, 1000, 3000, INT_MAX };
+const int sysctl_vals_new[] = { -1, 0, 1, 2, 4, 100, 200, 1000, 3000, INT_MAX};
 EXPORT_SYMBOL(sysctl_vals_new);
+const int sysctl_vals_compat[] = { -1, 0, 1, 2, 4, 5, 100, 200, 1000, 3000, INT_MAX};
 
 /* Support for permanently empty directories */
 

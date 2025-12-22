@@ -50,7 +50,7 @@ tcp_timewait_check_oow_rate_limit(struct inet_timewait_sock *tw,
 		/* Send ACK. Note, we do not put the bucket,
 		 * it will be released by caller.
 		 */
-		return TCP_TW_ACK;
+		return TCP_TW_ACK_OOW;
 	}
 
 	/* We are rate-limiting, so just release the tw sock and drop skb. */
@@ -397,10 +397,65 @@ void tcp_openreq_init_rwin(struct request_sock *req,
 }
 EXPORT_SYMBOL(tcp_openreq_init_rwin);
 
-static void tcp_ecn_openreq_child(struct tcp_sock *tp,
-				  const struct request_sock *req)
+void tcp_accecn_third_ack(struct sock *sk, const struct sk_buff *skb,
+			  u8 syn_ect_snt)
 {
-	tp->ecn_flags = inet_rsk(req)->ecn_ok ? TCP_ECN_OK : 0;
+	u8 ace = tcp_accecn_ace(tcp_hdr(skb));
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	switch (ace) {
+	case 0x0:
+		/* [CY] 3.2.2.1. ACE Field on the ACK of the SYN/ACK - If the Server is in AccECN mode and in SYN-RCVD
+		 * state, and if it receives a value of zero on a pure ACK with SYN=0 and no SACK blocks, for the rest
+		 * of the connection the Server MUST NOT set ECT on outgoing packets and MUST NOT respond to AccECN
+		 * feedback. Nonetheless, as a Data Receiver it MUST NOT disable AccECN feedback.
+		 */
+		tp->ecn_fail = 1;
+		tp->accecn_no_respond = 1;
+		break;
+	case 0x7:
+	case 0x5:
+	case 0x1:
+		/* Unused but legal values */
+		break;
+	default:
+		/* Validation only applies to first non-data packet */
+		if (TCP_SKB_CB(skb)->seq == TCP_SKB_CB(skb)->end_seq &&
+		    !TCP_SKB_CB(skb)->sacked &&
+		    tcp_accecn_validate_syn_feedback(sk, ace, syn_ect_snt)) {
+			if ((tcp_accecn_extract_syn_ect(ace) == INET_ECN_CE) &&
+			    !tp->delivered_ce)
+				tp->delivered_ce++;
+		}
+		break;
+	}
+}
+
+static void tcp_ecn_openreq_child(struct sock *sk,
+				  const struct request_sock *req,
+				  const struct sk_buff *skb)
+{
+	const struct tcp_request_sock *treq = tcp_rsk(req);
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	/* [CY] 3.1.5. Implications of AccECN Mode - A TCP Server in AccECN mode: MUST NOT set ECT on
+	 * any packet for the rest of the connection, if it has received or sent at least one valid
+	 * SYN or Acceptable SYN/ACK with (AE,CWR,ECE) = (0,0,0) during the handshake.
+	 */
+	if (treq->accecn_ok) {
+		const struct tcphdr *th = (const struct tcphdr *)skb->data;
+		tcp_ecn_mode_set(tp, TCP_ECN_MODE_ACCECN);
+		tp->syn_ect_snt = treq->syn_ect_snt;
+		tcp_accecn_third_ack(sk, skb, treq->syn_ect_snt);
+		tp->saw_accecn_opt = treq->saw_accecn_opt;
+		tp->prev_ecnfield = treq->syn_ect_rcv;
+		tp->accecn_opt_demand = 1;
+		tcp_ecn_received_counters(sk, skb, skb->len - th->doff * 4);
+	} else {
+		tcp_ecn_mode_set(tp, inet_rsk(req)->ecn_ok && !tcp_ca_no_fallback_rfc3168(sk) ?
+				     TCP_ECN_MODE_RFC3168 :
+				     TCP_ECN_DISABLED);
+	}
 }
 
 void tcp_ca_openreq_child(struct sock *sk, const struct dst_entry *dst)
@@ -447,6 +502,30 @@ static void smc_check_reset_syn_req(struct tcp_sock *oldtp,
 			newtp->syn_smc = 0;
 	}
 #endif
+}
+
+u8 tcp_accecn_option_init(const struct sk_buff *skb, u8 opt_offset)
+{
+	unsigned char *ptr = skb_transport_header(skb) + opt_offset;
+	unsigned int optlen = ptr[1] - 2;
+
+	WARN_ON_ONCE(ptr[0] != TCPOPT_ACCECN0 && ptr[0] != TCPOPT_ACCECN1);
+	ptr += 2;
+
+	/* Detect option zeroing: an AccECN connection "MAY check that the
+	 * initial value of the EE0B field or the EE1B field is non-zero"
+	 */
+	if (optlen < TCPOLEN_ACCECN_PERFIELD)
+		return TCP_ACCECN_OPT_EMPTY_SEEN;
+	if (get_unaligned_be24(ptr) == 0)
+		return TCP_ACCECN_OPT_FAIL;
+	if (optlen < TCPOLEN_ACCECN_PERFIELD * 3)
+		return TCP_ACCECN_OPT_COUNTER_SEEN;
+	ptr += TCPOLEN_ACCECN_PERFIELD * 2;
+	if (get_unaligned_be24(ptr) == 0)
+		return TCP_ACCECN_OPT_FAIL;
+
+	return TCP_ACCECN_OPT_COUNTER_SEEN;
 }
 
 /* This is not only more efficient than what we used to do, it eliminates
@@ -546,7 +625,7 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 	if (skb->len >= TCP_MSS_DEFAULT + newtp->tcp_header_len)
 		newicsk->icsk_ack.last_seg_size = skb->len - newtp->tcp_header_len;
 	newtp->rx_opt.mss_clamp = req->mss;
-	tcp_ecn_openreq_child(newtp, req);
+	tcp_ecn_openreq_child(newsk, req, skb);
 	newtp->fastopen_req = NULL;
 	RCU_INIT_POINTER(newtp->fastopen_rsk, NULL);
 
@@ -584,6 +663,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	bool own_req;
 
 	tmp_opt.saw_tstamp = 0;
+	tmp_opt.accecn = 0;
 	if (th->doff > (sizeof(struct tcphdr)>>2)) {
 		tcp_parse_options(sock_net(sk), skb, &tmp_opt, 0, NULL);
 
@@ -629,9 +709,24 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 		 */
 		if (!tcp_oow_rate_limited(sock_net(sk), skb,
 					  LINUX_MIB_TCPACKSKIPPEDSYNRECV,
-					  &tcp_rsk(req)->last_oow_ack_time) &&
+					  &tcp_rsk(req)->last_oow_ack_time)) {
 
-		    !inet_rtx_syn_ack(sk, req)) {
+		    if (tcp_rsk(req)->accecn_ok) {
+			/* [CY] 3.1.5 Implications of AccECN Mode - A host in AccECN mode that is feeding back the IP-ECN
+			 * field on a SYN or SYN/ACK: MUST feed back the IP-ECN field on the latest valid SYN or acceptable
+			 * SYN/ACK to arrive.
+			 */ 
+			tcp_rsk(req)->syn_ect_rcv = TCP_SKB_CB(skb)->ip_dsfield & INET_ECN_MASK;
+			if (tcp_accecn_ace(tcp_hdr(skb)) == 0x0) {
+			/* [CY] 3.1.5. Implications of AccECN Mode - A TCP Server in AccECN mode: MUST NOT set ECT on
+			 * any packet for the rest of the connection, if it has received or sent at least one valid
+			 * SYN or Acceptable SYN/ACK with (AE,CWR,ECE) = (0,0,0) during the handshake
+			 */
+			    tcp_sk(sk)->ecn_fail = 1;
+			}
+		    }
+
+		    if (!inet_rtx_syn_ack(sk, req)) {
 			unsigned long expires = jiffies;
 
 			expires += min(TCP_TIMEOUT_INIT << req->num_timeout,
@@ -640,6 +735,7 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 				mod_timer_pending(&req->rsk_timer, expires);
 			else
 				req->rsk_timer.expires = expires;
+		    }
 		}
 		return NULL;
 	}
@@ -756,6 +852,10 @@ struct sock *tcp_check_req(struct sock *sk, struct sk_buff *skb,
 	 */
 	if (!(flg & TCP_FLAG_ACK))
 		return NULL;
+
+	if (tcp_rsk(req)->accecn_ok && tmp_opt.accecn &&
+	    tcp_rsk(req)->saw_accecn_opt < TCP_ACCECN_OPT_COUNTER_SEEN)
+		tcp_rsk(req)->saw_accecn_opt = tcp_accecn_option_init(skb, tmp_opt.accecn);
 
 	/* For Fast Open no more processing is needed (sk is the
 	 * child socket).

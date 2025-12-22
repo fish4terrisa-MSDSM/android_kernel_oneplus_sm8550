@@ -271,6 +271,7 @@
 
 #include <net/icmp.h>
 #include <net/inet_common.h>
+#include <net/inet_ecn.h>
 #include <net/tcp.h>
 #include <net/mptcp.h>
 #include <net/xfrm.h>
@@ -447,6 +448,7 @@ void tcp_init_sock(struct sock *sk)
 	tp->snd_ssthresh = TCP_INFINITE_SSTHRESH;
 	tp->snd_cwnd_clamp = ~0;
 	tp->mss_cache = TCP_MSS_DEFAULT;
+	tp->mss_cache_set_by_ca = false;
 
 	tp->reordering = READ_ONCE(sock_net(sk)->ipv4.sysctl_tcp_reordering);
 	tcp_assign_congestion_control(sk);
@@ -3033,6 +3035,15 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->window_clamp = 0;
 	tp->delivered = 0;
 	tp->delivered_ce = 0;
+	tp->saw_accecn_opt = 0;
+        tp->ecn_fail = 0;
+        tp->accecn_no_respond = 0;
+        tp->accecn_no_options = 0;
+        tp->first_data_ack = 0;
+        tcp_accecn_init_counters(tp);
+        tp->prev_ecnfield = 0;
+        tp->accecn_opt_tstamp = 0;
+        tp->pkts_acked_ewma = 0;
 	if (icsk->icsk_ca_ops->release)
 		icsk->icsk_ca_ops->release(sk);
 	memset(icsk->icsk_ca_priv, 0, sizeof(icsk->icsk_ca_priv));
@@ -3773,12 +3784,12 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 		info->tcpi_rcv_wscale = tp->rx_opt.rcv_wscale;
 	}
 
-	if (tp->ecn_flags & TCP_ECN_OK)
+	if (tcp_ecn_mode_rfc3168(tp))
 		info->tcpi_options |= TCPI_OPT_ECN;
+	if (tcp_ecn_mode_accecn(tp))
+		info->tcpi_options |= TCPI_OPT_ACCECN;
 	if (tp->ecn_flags & TCP_ECN_SEEN)
 		info->tcpi_options |= TCPI_OPT_ECN_SEEN;
-	if (tp->ecn_flags & TCP_ECN_LOW)
-		info->tcpi_options |= TCPI_OPT_ECN_LOW;
 	if (tp->syn_data_acked)
 		info->tcpi_options |= TCPI_OPT_SYN_DATA;
 
@@ -3835,6 +3846,13 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_rcv_ooopack = tp->rcv_ooopack;
 	info->tcpi_snd_wnd = tp->snd_wnd;
 	info->tcpi_fastopen_client_fail = tp->fastopen_client_fail;
+	info->tcpi_received_ce = tp->received_ce;
+        info->tcpi_delivered_e1_bytes = tp->delivered_ecn_bytes[INET_ECN_ECT_1 - 1];
+        info->tcpi_delivered_e0_bytes = tp->delivered_ecn_bytes[INET_ECN_ECT_0 - 1];
+        info->tcpi_delivered_ce_bytes = tp->delivered_ecn_bytes[INET_ECN_CE - 1];
+        info->tcpi_received_e1_bytes = tp->received_ecn_bytes[INET_ECN_ECT_1 - 1];
+        info->tcpi_received_e0_bytes = tp->received_ecn_bytes[INET_ECN_ECT_0 - 1];
+        info->tcpi_received_ce_bytes = tp->received_ecn_bytes[INET_ECN_CE - 1];
 	unlock_sock_fast(sk, slow);
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);

@@ -152,7 +152,7 @@ static int bpf_tcp_ca_btf_struct_access(struct bpf_verifier_log *log,
 BPF_CALL_2(bpf_tcp_send_ack, struct tcp_sock *, tp, u32, rcv_nxt)
 {
 	/* bpf_tcp_ca prog cannot have NULL tp */
-	__tcp_send_ack((struct sock *)tp, rcv_nxt);
+	__tcp_send_ack((struct sock *)tp, rcv_nxt, 0);
 	return 0;
 }
 
@@ -250,7 +250,7 @@ BTF_ID(func, bbr_sndbuf_expand)
 BTF_ID(func, bbr_undo_cwnd)
 BTF_ID(func, bbr_cwnd_event)
 BTF_ID(func, bbr_ssthresh)
-BTF_ID(func, bbr_min_tso_segs)
+BTF_ID(func, bbr_tso_segs)
 BTF_ID(func, bbr_set_state)
 #endif
 #endif  /* CONFIG_DYNAMIC_FTRACE */

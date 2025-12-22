@@ -161,6 +161,7 @@ enum {
 	INET_DIAG_SK_BPF_STORAGES,
 	INET_DIAG_CGROUP_ID,
 	INET_DIAG_SOCKOPT,
+	INET_DIAG_PRAGUEINFO,
 	__INET_DIAG_MAX,
 };
 
@@ -286,9 +287,22 @@ struct tcp_bbr2_info {
 	__u32	bbr_extra_acked;	/* max excess packets ACKed in epoch */
 };
 
+/* INET_DIAG_PRAGUEINFO */
+
+struct tcp_prague_info {
+        __u64   prague_alpha;
+        __u64   prague_frac_cwnd;
+        __u64   prague_rate_bytes;
+        __u32   prague_max_burst;
+        __u32   prague_round;
+        __u32   prague_rtt_target;
+        bool    prague_enabled;
+};
+
 union tcp_cc_info {
 	struct tcpvegas_info	vegas;
 	struct tcp_dctcp_info	dctcp;
+	struct tcp_prague_info  prague;
 	struct tcp_bbr_info	bbr;
 	struct tcp_bbr2_info	bbr2;
 };

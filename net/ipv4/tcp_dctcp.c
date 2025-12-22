@@ -42,7 +42,8 @@
 #include <linux/inet_diag.h>
 #include "tcp_dctcp.h"
 
-#define DCTCP_MAX_ALPHA	1024U
+#define DCTCP_ALPHA_SHIFT 20U
+#define DCTCP_MAX_ALPHA	(1U << DCTCP_ALPHA_SHIFT)
 
 struct dctcp {
 	u32 old_delivered;
@@ -74,9 +75,9 @@ static void dctcp_reset(const struct tcp_sock *tp, struct dctcp *ca)
 
 static void dctcp_init(struct sock *sk)
 {
-	const struct tcp_sock *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 
-	if ((tp->ecn_flags & TCP_ECN_OK) ||
+	if (tcp_ecn_mode_any(tp) ||
 	    (sk->sk_state == TCP_LISTEN ||
 	     sk->sk_state == TCP_CLOSE)) {
 		struct dctcp *ca = inet_csk_ca(sk);
@@ -87,6 +88,7 @@ static void dctcp_init(struct sock *sk)
 
 		ca->loss_cwnd = 0;
 		ca->ce_state = 0;
+		tp->ecn_flags |= TCP_ECN_ECT_1;
 
 		dctcp_reset(tp, ca);
 		return;
@@ -103,9 +105,11 @@ static u32 dctcp_ssthresh(struct sock *sk)
 {
 	struct dctcp *ca = inet_csk_ca(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
+	u32 decr;
 
 	ca->loss_cwnd = tcp_snd_cwnd(tp);
-	return max(tcp_snd_cwnd(tp) - ((tcp_snd_cwnd(tp) * ca->dctcp_alpha) >> 11U), 2U);
+	decr = ((u64)tcp_snd_cwnd(tp) * ca->dctcp_alpha) >> (DCTCP_ALPHA_SHIFT + 1U);
+	return max(tcp_snd_cwnd(tp) - decr, 2U);
 }
 
 static void dctcp_update_alpha(struct sock *sk, u32 flags)
@@ -115,7 +119,7 @@ static void dctcp_update_alpha(struct sock *sk, u32 flags)
 
 	/* Expired RTT */
 	if (!before(tp->snd_una, ca->next_seq)) {
-		u32 delivered_ce = tp->delivered_ce - ca->old_delivered_ce;
+		u64 delivered_ce = tp->delivered_ce - ca->old_delivered_ce;
 		u32 alpha = ca->dctcp_alpha;
 
 		/* alpha = (1 - g) * alpha + g * F */
@@ -124,13 +128,10 @@ static void dctcp_update_alpha(struct sock *sk, u32 flags)
 		if (delivered_ce) {
 			u32 delivered = tp->delivered - ca->old_delivered;
 
-			/* If dctcp_shift_g == 1, a 32bit value would overflow
-			 * after 8 M packets.
-			 */
-			delivered_ce <<= (10 - dctcp_shift_g);
-			delivered_ce /= max(1U, delivered);
+			delivered_ce <<= (DCTCP_ALPHA_SHIFT - dctcp_shift_g);
+			delivered_ce = div64_u64(delivered_ce, max(1U, delivered));
 
-			alpha = min(alpha + delivered_ce, DCTCP_MAX_ALPHA);
+			alpha = min(alpha + (u32)delivered_ce, DCTCP_MAX_ALPHA);
 		}
 		/* dctcp_alpha can be read from dctcp_get_info() without
 		 * synchro, so we ask compiler to not use dctcp_alpha
@@ -223,7 +224,7 @@ static struct tcp_congestion_ops dctcp __read_mostly = {
 	.undo_cwnd	= dctcp_cwnd_undo,
 	.set_state	= dctcp_state,
 	.get_info	= dctcp_get_info,
-	.flags		= TCP_CONG_NEEDS_ECN,
+	.flags		= TCP_CONG_NEEDS_ECN | TCP_CONG_WANTS_CE_EVENTS,
 	.owner		= THIS_MODULE,
 	.name		= "dctcp",
 };

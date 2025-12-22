@@ -48,9 +48,11 @@ struct ctl_dir;
 #define SYSCTL_ONE_THOUSAND		((void *)&sysctl_vals_new[7])
 #define SYSCTL_THREE_THOUSAND		((void *)&sysctl_vals_new[8])
 #define SYSCTL_INT_MAX			((void *)&sysctl_vals_new[9])
+#define SYSCTL_FIVE			((void *)&sysctl_vals_compat[5])
 
 extern const int sysctl_vals[];
 extern const int sysctl_vals_new[];
+extern const int sysctl_vals_compat[];
 
 typedef int proc_handler(struct ctl_table *ctl, int write, void *buffer,
 		size_t *lenp, loff_t *ppos);

@@ -93,8 +93,9 @@ struct tcp_options_received {
 		smc_ok : 1,	/* SMC seen on SYN packet		*/
 		snd_wscale : 4,	/* Window scaling received from sender	*/
 		rcv_wscale : 4;	/* Window scaling to send to receiver	*/
-	u8	saw_unknown:1,	/* Received unknown option		*/
-		unused:7;
+	u8  accecn:6, /* AccECN index in header, 0=no options */
+			saw_unknown:1,  /* Received unknown option    */
+			unused:1;
 	u8	num_sacks;	/* Number of SACK blocks		*/
 	u16	user_mss;	/* mss requested by user in ioctl	*/
 	u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
@@ -126,6 +127,10 @@ struct tcp_request_sock {
 #if IS_ENABLED(CONFIG_MPTCP)
 	bool				drop_req;
 #endif
+	u8        accecn_ok  : 1,
+						saw_accecn_opt : 2,
+						syn_ect_snt: 2,
+						syn_ect_rcv: 2;
 	u32				txhash;
 	u32				rcv_isn;
 	u32				snt_isn;
@@ -206,6 +211,7 @@ struct tcp_sock {
 	u32	snd_wnd;	/* The window we expect to receive	*/
 	u32	max_window;	/* Maximal window ever seen from peer	*/
 	u32	mss_cache;	/* Cached effective mss, not including SACKS */
+	bool  mss_cache_set_by_ca;
 
 	u32	window_clamp;	/* Maximal window to advertise		*/
 	u32	rcv_ssthresh;	/* Current window clamp			*/
@@ -226,9 +232,16 @@ struct tcp_sock {
 	u8	compressed_ack;
 	u8	dup_ack_counter:2,
 		tlp_retrans:1,	/* TLP is a retransmission */
+		syn_ect_snt:2,  /* AccECN ECT memory, only */
+		syn_ect_rcv:2,  /* ... needed durign 3WHS + first seqno */
+		ecn_fail:1; /* ECN reflector detected path mangling */
+	u8  accecn_no_respond:1, /* AccECN no response on feedback */
+			accecn_no_options:1, /* AccECN no options send out */
+			first_data_ack:1;    /* Check for first data ack */
+	u8  saw_accecn_opt:2,    /* An AccECN option was seen */
 		fast_ack_mode:2, /* which fast ack mode ? */
 		tlp_orig_data_app_limited:1, /* app-limited before TLP rtx? */
-		unused:2;
+		unused:3;
 	u32	chrono_start;	/* Start time in jiffies of a TCP chrono */
 	u32	chrono_stat[3];	/* Time in jiffies for chrono_stat stats */
 	u8	chrono_type:2,	/* current chronograph type */
@@ -260,10 +273,18 @@ struct tcp_sock {
 	u64	tcp_mstamp;	/* most recent packet received/sent */
 	u32	srtt_us;	/* smoothed round trip time << 3 in usecs */
 	u32	mdev_us;	/* medium deviation			*/
+	u64 srtt_pace_us; /* smoothed round trip time pace in usecs */
+	u64 mdev_pace_us; /* medium deviation pace    */
+	u32 mrtt_pace_us;
 	u32	mdev_max_us;	/* maximal mdev for the last rtt period	*/
 	u32	rttvar_us;	/* smoothed mdev_max			*/
 	u32	rtt_seq;	/* sequence number to update rttvar	*/
 	struct  minmax rtt_min;
+
+	u8  g_srtt_shift;
+	u8  g_mdev_shift;
+	u64 classic_ecn; /* 0 ...  L_STICKY ... CLASSIC_ECN ... C_STICKY*/
+	u64 alpha;
 
 	u32	packets_out;	/* Packets which are "in flight"	*/
 	u32	retrans_out;	/* Retransmitted packets out		*/
@@ -302,6 +323,17 @@ struct tcp_sock {
 	u32	prr_out;	/* Total number of pkts sent during Recovery. */
 	u32	delivered;	/* Total data packets delivered incl. rexmits */
 	u32	delivered_ce;	/* Like the above but only ECE marked packets */
+	u32 delivered_ecn_bytes[3];
+	u32 received_ce;  /* Like the above but for received CE marked packets */
+	u32 received_ecn_bytes[3];
+	u8  received_ce_pending:4, /* Not yet transmitted cnt of received_ce */
+			unused2:4;
+	u8  accecn_minlen:2,/* Minimum length of AccECN option sent */
+			prev_ecnfield:2,/* ECN bits from the previous segment */
+			accecn_opt_demand:2,/* Demand AccECN option for n next ACKs */
+			estimate_ecnfield:2;/* ECN field for AccECN delivered estimates */
+	u16 pkts_acked_ewma;/* EWMA of packets acked for AccECN cep heuristic */
+	u64 accecn_opt_tstamp;  /* Last AccECN option sent timestamp */
 	u32	lost;		/* Total data packets lost incl. rexmits */
 	u32	app_limited;	/* limited until "delivered" reaches this val */
 	u64	first_tx_mstamp;  /* start of window send phase */

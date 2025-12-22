@@ -89,7 +89,10 @@ struct netns_ipv4 {
 	struct local_ports ip_local_ports;
 
 	u8 sysctl_tcp_ecn;
+	u8 sysctl_tcp_ecn_option;
+	u8 sysctl_tcp_ecn_option_beacon;
 	u8 sysctl_tcp_ecn_fallback;
+	u8 sysctl_tcp_ecn_unsafe_cep;
 
 	u8 sysctl_ip_default_ttl;
 	u8 sysctl_ip_no_pmtu_disc;
@@ -167,6 +170,7 @@ struct netns_ipv4 {
 	int sysctl_tcp_invalid_ratelimit;
 	int sysctl_tcp_pacing_ss_ratio;
 	int sysctl_tcp_pacing_ca_ratio;
+	int sysctl_tcp_pace_iw;
 	int sysctl_tcp_wmem[3];
 	int sysctl_tcp_rmem[3];
 	unsigned long sysctl_tcp_comp_sack_delay_ns;
