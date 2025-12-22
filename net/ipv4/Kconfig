@@ -672,8 +672,6 @@ config TCP_CONG_PRAGUE
   	TCP Prague is an enhancement for DCTCP to make DCTCP congestion
   	control deployable into general Internet.
 
-    To be completed ...
-
 config TCP_CONG_BBR
 	tristate "BBR TCP"
 	default n
