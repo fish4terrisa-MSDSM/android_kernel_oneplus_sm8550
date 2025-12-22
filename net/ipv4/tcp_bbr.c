@@ -365,7 +365,7 @@ static void bbr_check_probe_rtt_done(struct sock *sk);
  */
 static bool bbr_can_use_ecn(const struct sock *sk)
 {
-	return (tcp_sk(sk)->ecn_flags & TCP_ECN_OK) &&
+	return (tcp_sk(sk)->ecn_flags & TCP_ECN_MODE_RFC3168) &&
 	       (tcp_sk(sk)->ecn_flags & TCP_ECN_LOW);
 }
 
