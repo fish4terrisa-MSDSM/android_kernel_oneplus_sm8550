@@ -482,6 +482,9 @@ choice
 	config DEFAULT_FQ
 		bool "Fair Queue" if NET_SCH_FQ
 
+	config DEFAULT_DUALPI2
+		bool "DualPi2" if NET_SCH_DUALPI2
+
 	config DEFAULT_CODEL
 		bool "Controlled Delay" if NET_SCH_CODEL
 
@@ -502,6 +505,7 @@ config DEFAULT_NET_SCH
 	string
 	default "pfifo_fast" if DEFAULT_PFIFO_FAST
 	default "fq" if DEFAULT_FQ
+	default "dualpi2" if DEFAULT_DUALPI2
 	default "fq_codel" if DEFAULT_FQ_CODEL
 	default "fq_pie" if DEFAULT_FQ_PIE
 	default "sfq" if DEFAULT_SFQ
