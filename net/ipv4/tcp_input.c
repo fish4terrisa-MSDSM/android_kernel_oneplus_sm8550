@@ -4360,7 +4360,6 @@ static int tcp_ack(struct sock *sk, const struct sk_buff *skb, int flag)
 
 	delivered = tcp_newly_delivered(sk, &rs, delivered, flag);
 
-	delivered = tcp_newly_delivered(sk, delivered, flag);
 	lost = tp->lost - lost;			/* freshly marked lost */
 	rs.is_ack_delayed = !!(flag & FLAG_ACK_MAYBE_DELAYED);
 	rs.is_ece = !!(flag & FLAG_ECE);
