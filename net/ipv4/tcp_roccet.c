@@ -42,7 +42,13 @@
  * Unless CUBIC is enabled and congestion window is large
  * this behaves the same as the original Reno.
  */
-
+#pragma clang diagnostic ignored "-Wvisibility"
+#pragma clang diagnostic ignored "-Wcompare-distinct-pointer-types"
+#pragma clang diagnostic ignored "-Wdeclaration-after-statement"
+#pragma clang diagnostic ignored "-Wvisibility"
+#include <linux/types.h>
+#include <linux/bpf_verifier.h>
+#include <linux/bpf.h>
 #include "tcp_roccet.h"
 #include "linux/printk.h"
 #include <linux/btf.h>
@@ -205,7 +211,7 @@ static inline void update_srrtt(struct sock *sk)
 			 100;
 }
 
-__bpf_kfunc static void roccettcp_init(struct sock *sk)
+static void roccettcp_init(struct sock *sk)
 {
 	struct roccettcp *ca = inet_csk_ca(sk);
 
@@ -223,7 +229,7 @@ __bpf_kfunc static void roccettcp_init(struct sock *sk)
 	ca->ack_rate.cnt = 0;
 }
 
-__bpf_kfunc static void roccettcp_cwnd_event(struct sock *sk,
+static void roccettcp_cwnd_event(struct sock *sk,
 					     enum tcp_ca_event event)
 {
 	if (event == CA_EVENT_TX_START) {
@@ -403,7 +409,7 @@ tcp_friendliness:
 	ca->cnt = max(ca->cnt, 2U);
 }
 
-__bpf_kfunc static void roccettcp_cong_avoid(struct sock *sk, u32 ack,
+static void roccettcp_cong_avoid(struct sock *sk, u32 ack,
 					     u32 acked)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
@@ -515,7 +521,7 @@ __bpf_kfunc static void roccettcp_cong_avoid(struct sock *sk, u32 ack,
 	tcp_cong_avoid_ai(tp, max(1, ca->cnt), acked);
 }
 
-__bpf_kfunc static u32 roccettcp_recalc_ssthresh(struct sock *sk)
+static u32 roccettcp_recalc_ssthresh(struct sock *sk)
 {
 	const struct tcp_sock *tp = tcp_sk(sk);
 	struct roccettcp *ca = inet_csk_ca(sk);
@@ -540,14 +546,14 @@ __bpf_kfunc static u32 roccettcp_recalc_ssthresh(struct sock *sk)
 	return max((tcp_snd_cwnd(tp) * beta) / BICTCP_BETA_SCALE, 2U);
 }
 
-__bpf_kfunc static void roccettcp_state(struct sock *sk, u8 new_state)
+static void roccettcp_state(struct sock *sk, u8 new_state)
 {
 	struct roccettcp *ca = inet_csk_ca(sk);
 	if (new_state == TCP_CA_Loss)
 		roccettcp_reset(ca);
 }
 
-__bpf_kfunc static void roccettcp_acked(struct sock *sk,
+static void roccettcp_acked(struct sock *sk,
 					const struct ack_sample *sample)
 {
 	struct roccettcp *ca = inet_csk_ca(sk);
@@ -587,7 +593,7 @@ static struct tcp_congestion_ops roccet_tcp __read_mostly = {
 	.name = "roccet",
 };
 
-BTF_KFUNCS_START(tcp_roccet_check_kfunc_ids)
+/*BTF_KFUNCS_START(tcp_roccet_check_kfunc_ids)
 BTF_ID_FLAGS(func, roccettcp_init)
 BTF_ID_FLAGS(func, roccettcp_recalc_ssthresh)
 BTF_ID_FLAGS(func, roccettcp_cong_avoid)
@@ -595,7 +601,7 @@ BTF_ID_FLAGS(func, roccettcp_state)
 BTF_ID_FLAGS(func, roccettcp_cwnd_event)
 BTF_ID_FLAGS(func, roccettcp_acked)
 BTF_KFUNCS_END(tcp_roccet_check_kfunc_ids)
-
+*/
 static const struct btf_kfunc_id_set tcp_roccet_kfunc_set = {
 	.owner = THIS_MODULE,
 	.set = &tcp_roccet_check_kfunc_ids,
