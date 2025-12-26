@@ -602,10 +602,10 @@ BTF_ID_FLAGS(func, roccettcp_cwnd_event)
 BTF_ID_FLAGS(func, roccettcp_acked)
 BTF_KFUNCS_END(tcp_roccet_check_kfunc_ids)
 */
-static const struct btf_kfunc_id_set tcp_roccet_kfunc_set = {
+/*static const struct btf_kfunc_id_set tcp_roccet_kfunc_set = {
 	.owner = THIS_MODULE,
 	.set = &tcp_roccet_check_kfunc_ids,
-};
+};*/
 
 static int __init roccettcp_register(void)
 {
@@ -641,10 +641,10 @@ static int __init roccettcp_register(void)
 	/* divide by bic_scale and by constant Srtt (100ms) */
 	do_div(cube_factor, bic_scale * 10);
 
-	ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
-					&tcp_roccet_kfunc_set);
-	if (ret < 0)
-		return ret;
+	//ret = register_btf_kfunc_id_set(BPF_PROG_TYPE_STRUCT_OPS,
+	//				&tcp_roccet_kfunc_set);
+	//if (ret < 0)
+	//	return ret;
 	return tcp_register_congestion_control(&roccet_tcp);
 }
 
