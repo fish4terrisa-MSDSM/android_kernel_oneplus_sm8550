@@ -707,6 +707,13 @@ config TCP_CONG_DAVIS
 
 	TCP D*
 
+config TCP_CONG_ROCCET
+	tristate "ROCCET TCP"
+	default n
+	help
+
+	TCP ROCCET
+
 choice
 	prompt "Default TCP congestion control"
 	default DEFAULT_CUBIC
@@ -747,8 +754,11 @@ choice
 	config DEFAULT_BBR2
 		bool "BBR2" if TCP_CONG_BBR2=y
 
-		config DEFAULT_DAVIS
+	config DEFAULT_DAVIS
 		bool "DAVIS" if TCP_CONG_DAVIS=y
+
+	config DEFAULT_ROCCET
+		bool "ROCCET" if TCP_CONG_ROCCET=y
 
 	config DEFAULT_RENO
 		bool "Reno"
@@ -776,6 +786,7 @@ config DEFAULT_TCP_CONG
 	default "bbr" if DEFAULT_BBR
 	default "bbr2" if DEFAULT_BBR2
 	default "davis" if DEFAULT_DAVIS
+	default "roccet" if DEFAULT_ROCCET
 	default "cubic"
 
 config TCP_MD5SIG
