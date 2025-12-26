@@ -609,8 +609,6 @@ BTF_KFUNCS_END(tcp_roccet_check_kfunc_ids)
 
 static int __init roccettcp_register(void)
 {
-	int ret;
-
 	BUILD_BUG_ON(sizeof(struct roccettcp) > ICSK_CA_PRIV_SIZE);
 
 	/* Precompute a bunch of the scaling factors that are used per-packet
